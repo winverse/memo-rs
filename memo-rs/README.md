@@ -1,7 +1,5 @@
 # Run
 
-```Rust
-
+```bash
 cargo run main.rs
-
 ```
