@@ -18,7 +18,7 @@ impl File {
     }
 
     fn new_with_data(&mut self, name: &str, data: &Vec<u8>) -> &Self {
-        self.name = String::from(name);
+        self.name = String::from(name);  
         self.data = data.clone();
         self
     }
