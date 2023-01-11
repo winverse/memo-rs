@@ -75,5 +75,6 @@ fn main() {
         let msg = sat.recv(&mut mail_box);
 
         println!("message: {:?}", msg);
+        println!("message: {:?}", msg.unwrap().content);
     }
 }
