@@ -230,6 +230,7 @@ fn run(opt: Opt) -> Result<(), std::io::Error> {
 }
 fn main() {
     let opt = Opt::from_args();
+    println!("opt {:?}", opt);
     if let Err(e) = run(opt) {
         println!("an error occurred: {}", e);
     }
