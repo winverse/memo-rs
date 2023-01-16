@@ -37,6 +37,8 @@ impl<'buf> TryFrom<&'buf [u8]> for Request<'buf> {
         // str::from_utf8(buf).or(Err(ParseError::InvalidEncoding))?
 
         // impl From<Utf8Error> for ParseError {} 이렇게 입력해서 사용하면 아래 처럼 사용 가능
+        // str::from_utf8이 반환하는 값이 buf이기때문에
+        // buf의 lifetime과 request lifetime이 같아야 한다.
         let request = str::from_utf8(buf)?;
 
         // match get_next_word(request) {
