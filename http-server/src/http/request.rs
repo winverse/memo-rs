@@ -61,6 +61,7 @@ impl<'buf> TryFrom<&'buf [u8]> for Request<'buf> {
             path = &path[..i];
         }
 
+        // 구조체 안에 저장하는 모든 참조에 대해서 수명을 명시적으로 지정해야함!
         Ok(Self {
             path,
             query_string,
