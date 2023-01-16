@@ -5,24 +5,25 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::str;
 use std::str::Utf8Error;
 
-pub struct Request {
-    path: String,
-    query_string: Option<String>,
+pub struct Request<'buf> {
+    // 'buf buffer의 수명이라는 것을 의미함
+    path: &'buf str,
+    query_string: Option<&'buf str>,
     method: Method,
 }
-impl Request {
-    fn from_byte_array(buf: &[u8]) -> Result<Self, String> {
-        // buffer값 안에 무엇이 들어올지 예상할 수 없기 때문에 변환이 실패할 수 있음
-        // 변환을 위한 rust 내장 모듈이 있음 std::convert
-        // 실패하지 않는다면 std::convert::From 실패할 수도 있다면 std::convert::TryFrom
-    }
-}
+// impl<'buf> Request<'buf> {
+//     fn from_byte_array(buf: &[u8]) -> Result<Self, String> {
+//         // buffer값 안에 무엇이 들어올지 예상할 수 없기 때문에 변환이 실패할 수 있음
+//         // 변환을 위한 rust 내장 모듈이 있음 std::convert
+//         // 실패하지 않는다면 std::convert::From 실패할 수도 있다면 std::convert::TryFrom
+//     }
+// }
 
-impl TryFrom<&[u8]> for Request {
+impl<'buf> TryFrom<&'buf [u8]> for Request<'buf> {
     type Error = ParseError;
 
     // GET /search?=name=abc&sort=1 HTTP/1.1\r\n...HEADERS
-    fn try_from(buf: &[u8]) -> Result<Self, Self::Error> {
+    fn try_from(buf: &'buf [u8]) -> Result<Request<'buf>, Self::Error> {
         // match str::from_utf8(buf) {
         //     Ok(request) => {}
         //     Err(_) => return Err(ParseError::InvalidEncoding),
@@ -58,7 +59,11 @@ impl TryFrom<&[u8]> for Request {
             path = &path[..i];
         }
 
-        unimplemented!()
+        Ok(Self {
+            path,
+            query_string,
+            method,
+        })
     }
 }
 
