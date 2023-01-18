@@ -1,4 +1,5 @@
 use super::method::{Method, MethodError}; // super는 paerent인 http 모듈을 가리킨다.
+use super::QueryString;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
@@ -8,7 +9,7 @@ use std::str::Utf8Error;
 pub struct Request<'buf> {
     // 'buf buffer의 수명이라는 것을 의미함
     path: &'buf str,
-    query_string: Option<&'buf str>,
+    query_string: Option<QueryString<'buf>>,
     method: Method,
 }
 // impl<'buf> Request<'buf> {
@@ -57,7 +58,7 @@ impl<'buf> TryFrom<&'buf [u8]> for Request<'buf> {
         let method: Method = method.parse()?;
         let mut query_string = None;
         if let Some(i) = path.find("?") {
-            query_string = Some(&path[i + 1..]);
+            query_string = Some(QueryString::from(&path[i + 1..]));
             path = &path[..i];
         }
 
