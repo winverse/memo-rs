@@ -13,6 +13,22 @@ pub struct Request<'buf> {
     query_string: Option<QueryString<'buf>>,
     method: Method,
 }
+impl<'buf> Request<'buf> {
+    // getter
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    //getter
+    pub fn method(&self) -> &Method {
+        &self.method
+    }
+
+    pub fn query_string(&self) -> Option<&QueryString> {
+        self.query_string.as_ref()
+    }
+}
+
 // impl<'buf> Request<'buf> {
 //     fn from_byte_array(buf: &[u8]) -> Result<Self, String> {
 //         // buffer값 안에 무엇이 들어올지 예상할 수 없기 때문에 변환이 실패할 수 있음
