@@ -1,5 +1,6 @@
 use std::{num::ParseIntError, str::FromStr};
 
+#[derive(Debug)]
 pub enum Method {
     GET,
     POST,

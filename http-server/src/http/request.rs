@@ -6,6 +6,7 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::str;
 use std::str::Utf8Error;
 
+#[derive(Debug)]
 pub struct Request<'buf> {
     // 'buf buffer의 수명이라는 것을 의미함
     path: &'buf str,
@@ -48,7 +49,7 @@ impl<'buf> TryFrom<&'buf [u8]> for Request<'buf> {
         // }
 
         let (method, request) = get_next_word(request).ok_or(ParseError::InvalidRequest)?;
-        let (path, request) = get_next_word(request).ok_or(ParseError::InvalidRequest)?;
+        let (mut path, request) = get_next_word(request).ok_or(ParseError::InvalidRequest)?;
         let (protocol, request) = get_next_word(request).ok_or(ParseError::InvalidRequest)?;
 
         if protocol != "HTTP/1.1" {
@@ -138,5 +139,5 @@ impl Display for ParseError {
     }
 }
 
-impl Debug for ParseError {}
-impl Error for ParseError {}
+// impl Debug for ParseError {}
+// impl Error for ParseError {}

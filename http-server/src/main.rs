@@ -1,5 +1,5 @@
-#![allow(dead_code)]
-
+#![allow(dead_code)] // ! 를 추가하게 되면 전체 파일에 적용?
+#![warn(unused_variables)]
 mod http;
 mod server;
 

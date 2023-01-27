@@ -28,7 +28,9 @@ impl Server {
 
                             //[..] 의미 -> 전체 Array가 byte slice에 담기게 되어  try_from의 파라미터 &[u8] 요구 타입이 맞음
                             match Request::try_from(&buffer[..]) {
-                                Ok(request) => {}
+                                Ok(request) => {
+                                    dbg!(request);
+                                }
                                 Err(e) => println!("Failed to parse a request: {}", e),
                             }
                         }
