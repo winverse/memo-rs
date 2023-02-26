@@ -8,7 +8,7 @@ enum ParseError {
     FailedReadFile(#[from] std::io::Error),
     #[error("Empty field {0}")]
     EmptyField(String),
-    #[error("Parse Int error {0}")]
+    #[error("Parse Int error {0}")]+++
     ParseIntError(#[from] std::num::ParseIntError),
 }
 
