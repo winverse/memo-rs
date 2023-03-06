@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 axum = "0.6.10"
+dotenv = "0.15.0"
 sysinfo = "0.28.2"
 tokio = { version = "1.26.0", features = ["full"] }
