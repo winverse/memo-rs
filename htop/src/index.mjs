@@ -5,17 +5,22 @@ const html = htm.bind(h);
 
 function App(props) {
   return html`
-    <div>
-      ${props.cpus.map((cpu) => {
-        return html` <div>${cpu.toFixed(2)}% usage</div> `;
+    <ul>
+      ${props.cpus.map((cpu, index) => {
+        return html`
+          <li class="bar">
+            <div class="bar-inner" style="width: ${cpu}%;"></div>
+            <div class="bar-text">CPU ${index + 1}: ${cpu.toFixed(2)}%</div>
+          </li>
+        `;
       })}
-    </div>
+    </ul>
   `;
 }
 
 let i = 0;
 
-setInterval(async () => {
+const update = async () => {
   let res = await fetch("/api/cpus");
 
   if (res.status !== 200) {
@@ -24,4 +29,7 @@ setInterval(async () => {
 
   let json = await res.json();
   render(html`<${App} cpus=${json}></${App}>`, document.body);
-}, 1000);
+};
+
+update();
+setInterval(update, 200);
