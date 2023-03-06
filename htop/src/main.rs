@@ -24,7 +24,7 @@ async fn main() {
 
     let router = Router::new()
         .route("/", get(root_get))
-        .route("/index.js", get(javascript_get))
+        .route("/index.mjs", get(javascript_get))
         .route("/api/cpus", get(cpus_get))
         .with_state(AppState {
             sys: Arc::new(Mutex::new(System::new().into())),
@@ -54,7 +54,7 @@ async fn root_get() -> impl IntoResponse {
 
 #[axum::debug_handler]
 async fn javascript_get() -> impl IntoResponse {
-    let js = tokio::fs::read_to_string("src/index.js").await.unwrap();
+    let js = tokio::fs::read_to_string("src/index.mjs").await.unwrap();
     Response::builder()
         .header("content-type", "application/javascript;charset=utf-8")
         .body(js)
@@ -66,5 +66,6 @@ async fn cpus_get(State(state): State<AppState>) -> impl IntoResponse {
     let mut sys = state.sys.lock().unwrap();
     sys.refresh_cpu();
     let v: Vec<_> = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
+
     Json(v)
 }
