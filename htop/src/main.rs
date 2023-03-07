@@ -6,31 +6,33 @@ use axum::{
     http::Response,
     response::{Html, IntoResponse},
     routing::get,
-    Json, Router, Server,
+    Router, Server,
 };
 use dotenv::dotenv;
-use std::{
-    env,
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-};
+use std::{env, net::SocketAddr};
 use sysinfo::{CpuExt, System, SystemExt};
+use tokio::sync::broadcast;
 
-#[derive(Default, Clone)]
+type SnapShot = Vec<f32>;
+
+#[derive(Clone)]
 struct AppState {
-    cpus: Arc<Mutex<Vec<f32>>>,
+    tx: broadcast::Sender<SnapShot>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     dotenv().ok();
-    let app_state = AppState::default();
+
+    let (tx, _) = broadcast::channel::<SnapShot>(1);
+
+    let app_state = AppState { tx: tx.clone() };
 
     let router = Router::new()
         .route("/", get(root_get))
         .route("/index.mjs", get(js_get))
         .route("/index.css", get(css_get))
-        .route("/api/cpus", get(cpus_get))
+        // .route("/api/cpus", get(cpus_get))
         .route("/realtime/cpus", get(realtime_cpus_get))
         .with_state(app_state.clone());
 
@@ -40,13 +42,7 @@ async fn main() {
         loop {
             sys.refresh_cpu();
             let v: Vec<_> = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
-
-            // new scope created
-            // 코드 실행이 끝나면 lock이 해제가 되어서 lock time이 0ms가 출력이 됨
-            {
-                let mut cpus = app_state.cpus.lock().unwrap();
-                *cpus = v;
-            }
+            let _ = tx.send(v);
             // std::thread::sleep 은 비동기 코드에서 사용할 수 없는 이유는 이 함수가 현재 스레드를 지정된 시간 동안 재우는데,
             // 비동기 함수에서는 모든 비동기 함수가 같은 스레드에서 실행되기 때문입니다.
             // 따라서 std::thread::sleep 은 비동기 함수에 대해 아무것도 모르고 전체 스레드를 재우게 되어 다른 비동기 작업들도 멈추게 됩니다
@@ -95,14 +91,14 @@ async fn css_get() -> impl IntoResponse {
         .unwrap()
 }
 
-#[axum::debug_handler]
-async fn cpus_get(State(state): State<AppState>) -> impl IntoResponse {
-    let lock_start = std::time::Instant::now();
-    let v = state.cpus.lock().unwrap().clone();
-    let lock_elapsed = lock_start.elapsed().as_millis();
-    println!("Lock time: {}ms", lock_elapsed);
-    Json(v)
-}
+// #[axum::debug_handler]
+// async fn cpus_get(State(state): State<AppState>) -> impl IntoResponse {
+//     let lock_start = std::time::Instant::now();
+//     let v = state.cpus.lock().unwrap().clone();
+//     let lock_elapsed = lock_start.elapsed().as_millis();
+//     println!("Lock time: {}ms", lock_elapsed);
+//     Json(v)
+// }
 
 #[axum::debug_handler]
 async fn realtime_cpus_get(
@@ -115,11 +111,10 @@ async fn realtime_cpus_get(
 }
 
 async fn realtime_cpus_stream(app_state: AppState, mut ws: WebSocket) {
-    loop {
-        let cpus = app_state.cpus.lock().unwrap().clone();
-        let payload = serde_json::to_string(&*cpus).unwrap();
+    let mut rx = app_state.tx.subscribe();
+
+    while let Ok(msg) = rx.recv().await {
+        let payload = serde_json::to_string(&msg).unwrap();
         ws.send(Message::Text(payload)).await.unwrap();
-        // 비동기에서는 std::thread::sleep를 사용할 수 없음
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 }
