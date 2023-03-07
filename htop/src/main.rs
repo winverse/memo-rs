@@ -1,5 +1,8 @@
 use axum::{
-    extract::State,
+    extract::{
+        ws::{Message, WebSocket},
+        State, WebSocketUpgrade,
+    },
     http::Response,
     response::{Html, IntoResponse},
     routing::get,
@@ -28,6 +31,7 @@ async fn main() {
         .route("/index.mjs", get(js_get))
         .route("/index.css", get(css_get))
         .route("/api/cpus", get(cpus_get))
+        .route("/realtime/cpus", get(realtime_cpus_get))
         .with_state(app_state.clone());
 
     // Update CPU usage in the background
@@ -43,7 +47,12 @@ async fn main() {
                 let mut cpus = app_state.cpus.lock().unwrap();
                 *cpus = v;
             }
+            // std::thread::sleep 은 비동기 코드에서 사용할 수 없는 이유는 이 함수가 현재 스레드를 지정된 시간 동안 재우는데,
+            // 비동기 함수에서는 모든 비동기 함수가 같은 스레드에서 실행되기 때문입니다.
+            // 따라서 std::thread::sleep 은 비동기 함수에 대해 아무것도 모르고 전체 스레드를 재우게 되어 다른 비동기 작업들도 멈추게 됩니다
 
+            // 비동기 코드에서 스레드를 재우고 싶다면 async_std::task::sleep 과 같은 비동기 버전의 함수를 사용해야 합니다.
+            // 이 함수는 std::thread::sleep 과 유사하지만 비동기 작업을 방해하지 않습니다.
             std::thread::sleep(System::MINIMUM_CPU_UPDATE_INTERVAL);
         }
     });
@@ -93,4 +102,24 @@ async fn cpus_get(State(state): State<AppState>) -> impl IntoResponse {
     let lock_elapsed = lock_start.elapsed().as_millis();
     println!("Lock time: {}ms", lock_elapsed);
     Json(v)
+}
+
+#[axum::debug_handler]
+async fn realtime_cpus_get(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    ws.on_upgrade(|ws: WebSocket| async {
+        realtime_cpus_stream(state, ws).await;
+    })
+}
+
+async fn realtime_cpus_stream(app_state: AppState, mut ws: WebSocket) {
+    loop {
+        let cpus = app_state.cpus.lock().unwrap().clone();
+        let payload = serde_json::to_string(&*cpus).unwrap();
+        ws.send(Message::Text(payload)).await.unwrap();
+        // 비동기에서는 std::thread::sleep를 사용할 수 없음
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
 }
