@@ -13,23 +13,40 @@ use std::{
 };
 use sysinfo::{CpuExt, System, SystemExt};
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 struct AppState {
-    sys: Arc<Mutex<System>>,
+    cpus: Arc<Mutex<Vec<f32>>>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     dotenv().ok();
+    let app_state = AppState::default();
 
     let router = Router::new()
         .route("/", get(root_get))
         .route("/index.mjs", get(js_get))
         .route("/index.css", get(css_get))
         .route("/api/cpus", get(cpus_get))
-        .with_state(AppState {
-            sys: Arc::new(Mutex::new(System::new().into())),
-        });
+        .with_state(app_state.clone());
+
+    // Update CPU usage in the background
+    tokio::task::spawn_blocking(move || {
+        let mut sys = System::new();
+        loop {
+            sys.refresh_cpu();
+            let v: Vec<_> = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
+
+            // new scope created
+            // 코드 실행이 끝나면 lock이 해제가 되어서 lock time이 0ms가 출력이 됨
+            {
+                let mut cpus = app_state.cpus.lock().unwrap();
+                *cpus = v;
+            }
+
+            std::thread::sleep(System::MINIMUM_CPU_UPDATE_INTERVAL);
+        }
+    });
 
     let address: SocketAddr = env::var("SERVER_ADDRESS")
         .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
@@ -38,13 +55,11 @@ async fn main() {
 
     let server = Server::bind(&address).serve(router.into_make_service());
 
-    match server.await {
-        Ok(_) => println!("listening on  {}", address),
-        Err(e) => eprintln!("server error: {}", e),
+    if let Err(e) = server.await {
+        eprintln!("server error: {}", e);
+    } else {
+        println!("listening on  {}", address);
     }
-    let message: String = String::from("hello");
-
-    println!("message: {}", message);
 }
 
 #[axum::debug_handler]
@@ -73,9 +88,9 @@ async fn css_get() -> impl IntoResponse {
 
 #[axum::debug_handler]
 async fn cpus_get(State(state): State<AppState>) -> impl IntoResponse {
-    let mut sys = state.sys.lock().unwrap();
-    sys.refresh_cpu();
-    let v: Vec<_> = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
-
+    let lock_start = std::time::Instant::now();
+    let v = state.cpus.lock().unwrap().clone();
+    let lock_elapsed = lock_start.elapsed().as_millis();
+    println!("Lock time: {}ms", lock_elapsed);
     Json(v)
 }
