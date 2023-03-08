@@ -39,7 +39,6 @@ enum InputMode {
 
 #[derive(Clone)]
 struct Password {
-    id: usize,
     title: String,
     username: String,
     password: String,
@@ -47,7 +46,6 @@ struct Password {
 impl Password {
     pub fn new(title: String, username: String, password: String) -> Self {
         Self {
-            id: 0,
             title,
             username,
             password,
@@ -98,6 +96,15 @@ impl PassManager {
         self.passwords.push(password);
         self.clear_fields();
         self.change_mode(InputMode::Normal);
+    }
+
+    pub fn search(&mut self) {
+        self.search_list = self
+            .passwords
+            .iter()
+            .filter(|password| password.title.starts_with(&self.search_txt))
+            .cloned()
+            .collect();
     }
 }
 
@@ -219,9 +226,11 @@ fn run_app<B: Backend>(
                     }
                     KeyCode::Char(c) => {
                         state.search_txt.push(c);
+                        state.search();
                     }
                     KeyCode::Backspace => {
                         state.search_txt.pop();
+                        state.search();
                     }
                     _ => {}
                 },
@@ -335,10 +344,10 @@ fn new_section<B: Backend>(frame: &mut Frame<B>, state: &mut PassManager, area: 
 }
 
 fn list_section<B: Backend>(frame: &mut Frame<B>, state: &mut PassManager, area: Rect) {
-    let list_to_show = if state.search_list.is_empty() {
-        state.passwords.to_owned()
-    } else {
+    let list_to_show = if state.mode == InputMode::Search {
         state.search_list.to_owned()
+    } else {
+        state.passwords.to_owned()
     };
     let items: Vec<ListItem> = list_to_show
         .into_iter()
