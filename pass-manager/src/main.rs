@@ -7,23 +7,25 @@ use crossterm::{event, execute};
 use std::error::Error;
 use tui::backend::{Backend, CrosstermBackend};
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Style};
-use tui::widgets::{Block, BorderType, Borders, ListState, Paragraph};
+use tui::style::{Color, Modifier, Style};
+use tui::text::Span;
+use tui::widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph};
 use tui::{Frame, Terminal};
 
 const APP_KEYS_DESC: &str = r#"
-L:           List
+L:           Show/Hide List
 U:           On list, It's copy the Username
 P:           On list, It's copy the Password
 D:           On list, It's Delete
 E:           On list, It's Edit
 S:           Search
-Insert Btn:  Insert new Password
+Insert:      Insert new Password
 Tab:         Go to next field
 Shift+Tab:   Go to previous filed
 Esc:         Exit insert mode
 "#;
 
+#[derive(Eq, PartialEq)]
 enum InputMode {
     Normal,
     Title,
@@ -35,10 +37,22 @@ enum InputMode {
     Delete,
 }
 
+#[derive(Clone)]
 struct Password {
+    id: usize,
     title: String,
     username: String,
     password: String,
+}
+impl Password {
+    pub fn new(title: String, username: String, password: String) -> Self {
+        Self {
+            id: 0,
+            title,
+            username,
+            password,
+        }
+    }
 }
 
 struct PassManager {
@@ -73,6 +87,17 @@ impl PassManager {
         self.new_title.clear();
         self.new_username.clear();
         self.new_password.clear();
+    }
+
+    pub fn insert(&mut self) {
+        let password = Password::new(
+            self.new_title.to_owned(),
+            self.new_username.to_owned(),
+            self.new_password.to_owned(),
+        );
+        self.passwords.push(password);
+        self.clear_fields();
+        self.change_mode(InputMode::Normal);
     }
 }
 
@@ -117,8 +142,9 @@ fn run_app<B: Backend>(
                     KeyCode::Char('l') => {
                         state.change_mode(InputMode::List);
                     }
-                    KeyCode::Insert => {
-                        state.change_mode(InputMode::Username);
+                    // insert key
+                    KeyCode::Char('\u{f746}') => {
+                        state.change_mode(InputMode::Title);
                     }
                     _ => {}
                 },
@@ -181,8 +207,9 @@ fn run_app<B: Backend>(
                         state.clear_fields();
                         state.change_mode(InputMode::Normal);
                     }
-                    KeyCode::BackTab => {
-                        state.change_mode(InputMode::Password);
+                    KeyCode::BackTab => state.change_mode(InputMode::Password),
+                    KeyCode::Enter => {
+                        state.insert();
                     }
                     _ => {}
                 },
@@ -199,6 +226,9 @@ fn run_app<B: Backend>(
                     _ => {}
                 },
                 InputMode::List => match key.code {
+                    KeyCode::Char('l') => {
+                        state.change_mode(InputMode::Normal);
+                    }
                     KeyCode::Esc => {
                         state.change_mode(InputMode::Normal);
                     }
@@ -229,6 +259,7 @@ fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut PassManager) {
         .border_type(BorderType::Rounded);
 
     frame.render_widget(list_section_block, parent_chunk[1]);
+    list_section(frame, state, parent_chunk[1]);
 }
 
 fn new_section<B: Backend>(frame: &mut Frame<B>, state: &mut PassManager, area: Rect) {
@@ -303,4 +334,47 @@ fn new_section<B: Backend>(frame: &mut Frame<B>, state: &mut PassManager, area: 
     frame.render_widget(submit_btn, new_section_chunk[4]);
 }
 
-fn list_section<B: Backend>(frame: &mut Frame<B>, state: &mut PassManager) {}
+fn list_section<B: Backend>(frame: &mut Frame<B>, state: &mut PassManager, area: Rect) {
+    let list_to_show = if state.search_list.is_empty() {
+        state.passwords.to_owned()
+    } else {
+        state.search_list.to_owned()
+    };
+    let items: Vec<ListItem> = list_to_show
+        .into_iter()
+        .map(|item| match state.mode {
+            InputMode::List => ListItem::new(format!(
+                "{}: {} - {}",
+                item.title.to_owned(),
+                item.username.to_owned(),
+                item.password.to_owned()
+            )),
+            _ => ListItem::new(Span::from(item.title)),
+        })
+        .collect();
+
+    let list_chunks = Layout::default()
+        .margin(2)
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(1)].as_ref())
+        .split(area);
+
+    let search_input = Paragraph::new(state.search_txt.to_owned())
+        .block(
+            Block::default()
+                .title("Search")
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded),
+        )
+        .style(match state.mode {
+            InputMode::Search => Style::default().fg(Color::Yellow),
+            _ => Style::default(),
+        });
+    frame.render_widget(search_input, list_chunks[0]);
+
+    let list = List::new(items)
+        .block(Block::default())
+        .highlight_symbol("->")
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+    frame.render_stateful_widget(list, list_chunks[1], &mut state.list_state);
+}
