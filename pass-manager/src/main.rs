@@ -249,6 +249,8 @@ fn run_app<B: Backend>(
     }
 }
 
+// static dispatch
+// ui함수는 B 타입이 Backend 트레잇을 구현하는 경우에만 호출한다.
 fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut PassManager) {
     let parent_chunk = Layout::default()
         .direction(Direction::Horizontal)
