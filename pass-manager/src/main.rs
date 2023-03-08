@@ -1,11 +1,14 @@
-use std::error::Error;
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture, KeyCode};
-use crossterm::{event, execute};
 use crossterm::event::Event::Key;
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture, KeyCode};
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
+use crossterm::{event, execute};
+use std::error::Error;
 use tui::backend::{Backend, CrosstermBackend};
+use tui::layout::{Constraint, Direction, Layout};
+use tui::widgets::{Block, BorderType, Borders, ListState};
 use tui::{Frame, Terminal};
-use tui::widgets::ListState;
 
 enum InputMode {
     Normal,
@@ -15,13 +18,13 @@ enum InputMode {
     Submit,
     Search,
     List,
-    Delete
+    Delete,
 }
 
 struct Password {
     title: String,
     username: String,
-    password: String
+    password: String,
 }
 
 struct PassManager {
@@ -35,7 +38,7 @@ struct PassManager {
     new_password: String,
 }
 impl PassManager {
-    fn new () -> Self {
+    fn new() -> Self {
         Self {
             mode: InputMode::Normal,
             list_state: ListState::default(),
@@ -47,17 +50,23 @@ impl PassManager {
             new_password: String::new(),
         }
     }
+
+    pub fn change_mode(&mut self, mode: InputMode) {
+        self.mode = mode;
+    }
+
+    pub fn clear_fields(&mut self) {
+        self.new_title.clear();
+        self.new_username.clear();
+        self.new_password.clear();
+    }
 }
 
-fn main() -> Result<(), Box<dyn Error>>{
+fn main() -> Result<(), Box<dyn Error>> {
     let mut state = PassManager::new();
 
     enable_raw_mode()?;
-    execute!(
-        std::io::stdout(),
-        EnterAlternateScreen,
-        EnableMouseCapture
-    )?;
+    execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
 
     let backend = CrosstermBackend::new(std::io::stdout());
     let mut terminal = Terminal::new(backend)?;
@@ -78,102 +87,132 @@ fn main() -> Result<(), Box<dyn Error>>{
     Ok(())
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, state: &mut PassManager) -> Result<(), std::io::Error> {
+fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    state: &mut PassManager,
+) -> Result<(), std::io::Error> {
     loop {
         terminal.draw(|frame| ui(frame, state))?;
-
-        if let Key(key) =  event::read()? {
+        if let Key(key) = event::read()? {
             match state.mode {
-                InputMode::Normal => {
-                    match key.code {
-                        KeyCode::Char('q') => {
-                            return Ok(())
-                        }
-                        KeyCode::Char('s') => {
-                            // search mode
-                        }
-                        KeyCode::Char('l') => {
-                            // list mode
-                        }
-                        KeyCode::Insert => {
-                            // insert mode
-                        }
-                        _ => {}
+                InputMode::Normal => match key.code {
+                    KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Char('s') => {
+                        state.change_mode(InputMode::Search);
                     }
-                }
-                InputMode::Title => {
-                    match key.code {
-                        KeyCode::Esc => {
-                            // exit from title to normal mode
-                        }
-                        KeyCode::Char(c) => {
-                            state.new_title.push(c);
-                        }
-                        KeyCode::Backspace => {
-                            state.new_title.pop();
-                        }
-                        _ => {}
+                    KeyCode::Char('l') => {
+                        state.change_mode(InputMode::List);
                     }
-                }
-                InputMode::Username => {
-                    match key.code {
-                        KeyCode::Esc => {
-                            // exit from username to normal mode
-                        }
-                        KeyCode::Char(c) => {
-                            state.new_username.push(c);
-                        }
-                        KeyCode::Backspace => {
-                            state.new_username.pop();
-                        }
-                        _ => {}
+                    KeyCode::Insert => {
+                        state.change_mode(InputMode::Username);
                     }
-                }
-                InputMode::Password => {
-                    match key.code {
-                        KeyCode::Esc => {
-                            // exit from password to normal mode
-                        }
-                        KeyCode::Char(c) => {
-                            state.new_password.push(c);
-                        }
-                        KeyCode::Backspace => {
-                            state.new_password.pop();
-                        }
-                        _ => {}
+                    _ => {}
+                },
+                InputMode::Title => match key.code {
+                    KeyCode::Esc => {
+                        state.clear_fields();
+                        state.change_mode(InputMode::Normal);
                     }
-                }
-                InputMode::Submit => {
-                    match key.code {
-                        KeyCode::Esc => {
-                            // exit from submit to normal mode
-                        }
-                        KeyCode::BackTab => {
-                            // change mode to Password
-                        }
-                        _ => {}
+                    KeyCode::Char(c) => {
+                        state.new_title.push(c);
                     }
-                }
-                InputMode::Search => {
-                    match key.code {
-                        KeyCode::Esc => {
-                            // exit from search to normal mode
-                        }
-                        _ => {}
+                    KeyCode::Backspace => {
+                        state.new_title.pop();
                     }
-                }
-                InputMode::List => {
-                    match key.code {
-                        KeyCode::Esc => {
-                            // exit from list to normal mode
-                        }
-                        _ => {}
+                    KeyCode::Tab => {
+                        state.change_mode(InputMode::Username);
                     }
-                }
+                    _ => {}
+                },
+                InputMode::Username => match key.code {
+                    KeyCode::Esc => {
+                        state.clear_fields();
+                        state.change_mode(InputMode::Normal);
+                    }
+                    KeyCode::Char(c) => {
+                        state.new_username.push(c);
+                    }
+                    KeyCode::Backspace => {
+                        state.new_username.pop();
+                    }
+                    KeyCode::Tab => {
+                        state.change_mode(InputMode::Password);
+                    }
+                    KeyCode::BackTab => {
+                        state.change_mode(InputMode::Title);
+                    }
+                    _ => {}
+                },
+                InputMode::Password => match key.code {
+                    KeyCode::Esc => {
+                        state.clear_fields();
+                        state.change_mode(InputMode::Normal);
+                    }
+                    KeyCode::Char(c) => {
+                        state.new_password.push(c);
+                    }
+                    KeyCode::Backspace => {
+                        state.new_password.pop();
+                    }
+                    KeyCode::Tab => {
+                        state.change_mode(InputMode::Submit);
+                    }
+                    KeyCode::BackTab => {
+                        state.change_mode(InputMode::Username);
+                    }
+                    _ => {}
+                },
+                InputMode::Submit => match key.code {
+                    KeyCode::Esc => {
+                        state.clear_fields();
+                        state.change_mode(InputMode::Normal);
+                    }
+                    KeyCode::BackTab => {
+                        state.change_mode(InputMode::Password);
+                    }
+                    _ => {}
+                },
+                InputMode::Search => match key.code {
+                    KeyCode::Esc => {
+                        state.change_mode(InputMode::Normal);
+                    }
+                    KeyCode::Char(c) => {
+                        state.search_txt.push(c);
+                    }
+                    KeyCode::Backspace => {
+                        state.search_txt.pop();
+                    }
+                    _ => {}
+                },
+                InputMode::List => match key.code {
+                    KeyCode::Esc => {
+                        state.change_mode(InputMode::Normal);
+                    }
+                    _ => {}
+                },
                 InputMode::Delete => {}
             }
         }
     }
 }
 
-fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut PassManager) {}
+fn ui<B: Backend>(frame: &mut Frame<B>, state: &mut PassManager) {
+    let parent_chunk = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(frame.size());
+
+    let new_section_block = Block::default()
+        .title("New Password")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded);
+
+    frame.render_widget(new_section_block, parent_chunk[0]);
+
+    let list_section_block = Block::default()
+        .title("List of password")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded);
+
+    frame.render_widget(list_section_block, parent_chunk[1]);
+}
